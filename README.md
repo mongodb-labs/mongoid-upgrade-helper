@@ -85,7 +85,8 @@ them into an `Analyzer` and have it tell you the differences:
 require 'mongoid'
 require 'mongoid/upgrade_helper'
 
-analyzer = Mongoid::UpgradeHelper::Analyzer.new('commands.log', 'commands-new.log')
+analyzer = Mongoid::UpgradeHelper::Analyzer.new('commands.log',
+                                                'commands-replayed.log')
 
 puts "Differences:"
 puts analyzer.differences
