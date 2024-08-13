@@ -78,4 +78,15 @@ watcher process, as unmodified as possible.
 
 ## `Analyzer`
 
-_TODO_
+Once you have both logs (from the `Watcher` and the `Replayer`), you can feed
+them into an `Analyzer` and have it tell you the differences:
+
+```ruby
+require 'mongoid'
+require 'mongoid/upgrade_helper'
+
+analyzer = Mongoid::UpgradeHelper::Analyzer.new('commands.log', 'commands-new.log')
+
+puts "Differences:"
+puts analyzer.differences
+```

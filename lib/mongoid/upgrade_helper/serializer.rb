@@ -59,7 +59,7 @@ module Mongoid
             s << 'Criteria._mongoid_upgrade_helper_deserialize('
             s << klass.name << ','
             s << embedded?.inspect << ','
-            s << none?.inspect << ','
+            s << empty_and_chainable?.inspect << ','
             s << Serializer.serialize(options) << ','
             s << Serializer.serialize(selector) << ','
             s << Serializer.serialize(pipeline) << ','

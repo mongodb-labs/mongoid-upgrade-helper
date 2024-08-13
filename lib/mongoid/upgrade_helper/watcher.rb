@@ -104,11 +104,15 @@ module Mongoid
         def start_watching(receiver, message, block_present, *args, **kwargs)
           Thread.current[WATCHER_THREAD_KEY] = next_id
 
-          emit :start, Serializer.serialize(receiver: receiver,
-                                            message: message,
-                                            args: args,
-                                            kwargs: kwargs,
-                                            block: block_present)
+          payload = { receiver: receiver,
+                      message: message,
+                      args: args,
+                      kwargs: kwargs,
+                      block: block_present }
+
+          serialized = Serializer.serialize(payload)
+
+          emit :start, serialized
         end
 
         # Stops listening for commands from the most recent recever#message
