@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
-require 'json'
+require 'base64'
+require_relative 'serializer'
 require_relative 'watcher/watchable'
 require_relative 'watcher/setup'
 
@@ -40,7 +41,7 @@ module Mongoid
         end
 
         # delegate to the singleton instance for convenience
-        def_delegators :instance, :watch, :suppress
+        def_delegators :instance, :watch, :suppress, :with_watch
       end
 
       # Create a new Watcher instance. This will attempt to subscribe globally to all
@@ -83,6 +84,18 @@ module Mongoid
           Thread.current[WATCHER_THREAD_KEY] = current_watch
         end
 
+        # Executes a block with the given watch identifier. Note that this will
+        # suppress `start` and `stop` actions; only `command` actions will be
+        # emitted, and will all be tagged with the given watch identifier.
+        #
+        # @param [ String ] watch the identifier of the watch to use
+        def with_watch(watch)
+          saved, Thread.current[WATCHER_THREAD_KEY] = Thread.current[WATCHER_THREAD_KEY], watch
+          yield
+        ensure
+          Thread.current[WATCHER_THREAD_KEY] = saved
+        end
+
         private
 
         # Starts listening for commands from the given receiver#message
@@ -91,18 +104,17 @@ module Mongoid
         def start_watching(receiver, message, block_present, *args, **kwargs)
           Thread.current[WATCHER_THREAD_KEY] = next_id
 
-          emit action: :start,
-               receiver: serialize(receiver),
-               message: message,
-               args: args,
-               kwargs: kwargs,
-               block: block_present
+          emit :start, Serializer.serialize(receiver: receiver,
+                                            message: message,
+                                            args: args,
+                                            kwargs: kwargs,
+                                            block: block_present)
         end
 
         # Stops listening for commands from the most recent recever#message
         # invocation. This will emit a "stop" action.
         def stop_watching
-          emit action: :stop
+          emit :stop
           Thread.current[WATCHER_THREAD_KEY] = nil
         end
 
@@ -117,7 +129,7 @@ module Mongoid
         def started(event)
           # we only emit the command if there is a current invocation active,
           # as that means we're within the scope of an observed API call.
-          emit action: :command, command: event.command if current_watch
+          emit :command, event.command.to_json if current_watch
         end
 
         # Invoked by the driver when a database command succeeds.
@@ -135,46 +147,22 @@ module Mongoid
 
       # Serializes (via JSON) the given payload, and then passes the result to
       # the registered `on_action` handler.
-      def emit(payload)
-        full_payload = prepare_payload(payload)
+      def emit(action, payload = nil)
+        full_payload = "#{action}:#{current_watch}:#{payload}"
+
         Mongoid::UpgradeHelper.on_action&.call(full_payload)
       rescue Exception => e
         Mongoid.logger.error("could not emit Mongoid::UpgradeHelper action: #{e.class} #{e.message}")
       end
 
-      def prepare_payload(payload)
-        payload.merge(id: current_watch).to_json
-      rescue Exception => e
-        { id: current_watch, action: payload[:action], error: "#{e.class}: #{e.message}" }.to_json
+      def marshal(payload)
+        dump = Marshal.dump(payload)
+        Base64.strict_encode64(dump)
       end
 
       def next_id
         @id_mutex.synchronize do
-          "#{@uuid}:#{@next_id}".tap { @next_id += 1 }
-        end
-      end
-
-      def serialize(object)
-        case object
-        when Mongoid::Document
-          { type: :document,
-            class: object.class.name,
-            attrs: object.as_document }
-        when Criteria
-          { type: :criteria,
-            class: object.klass.name,
-            selector: object.selector,
-            options: object.options,
-            inclusions: object.inclusions,
-            scoping_options: object.scoping_options,
-            documents: object.documents }
-        when Mongoid::Contextual::Mongo
-          # probably will need to save some additional state, too...maybe?
-          { type: :context, criteria: serialize(object.criteria) }
-        when Class
-          { type: :class, class: object.name }
-        else
-          { type: :object, object: object }
+          "#{@uuid}.#{@next_id}".tap { @next_id += 1 }
         end
       end
     end

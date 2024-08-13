@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require_relative 'upgrade_helper/replayer'
+require_relative 'upgrade_helper/setup'
 require_relative 'upgrade_helper/watcher'
 
 module Mongoid

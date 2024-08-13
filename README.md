@@ -44,7 +44,36 @@ was configured, ready to be replayed by the `Replayer` and analyzed by the
 
 ## `Replayer`
 
-_TODO_
+The `Replayer` system depends on the `Watcher`, and also installs wrappers
+around some core Mongoid APIs. It is given the output of a previous `Watcher`
+run, and is run in a separate (non-production) process, with a newer version
+of Mongoid. It replays the commands from the `Watcher` log, and the resulting
+commands are then logged to a new location (distinct from the original log).
+
+This tool is intended to be used in conjunction with the `Watcher` and the
+`Analyzer`.
+
+To set up the replayer:
+
+```ruby
+require 'mongoid'
+require 'mongoid/upgrade_helper'
+
+# This MUST be called before any clients have been created.
+Mongoid::UpgradeHelper::Replayer.setup!
+
+COMMAND_LOG = File.open('commands-replayed.log', 'a')
+Mongoid::UpgradeHelper.on_action { |action| COMMAND_LOG.puts(action) }
+
+# ...
+
+Mongoid::UpgradeHelper::Replayer.with_file('commands.log') do |replayer|
+  replayer.replay!
+end
+```
+
+Note that the replayer process must have access to the same models as the
+watcher process, as unmodified as possible.
 
 
 ## `Analyzer`
