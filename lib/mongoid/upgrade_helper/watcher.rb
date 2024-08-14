@@ -36,6 +36,7 @@ module Mongoid
 
           Mongoid::Contextual::Mongo.prepend Mongoid::UpgradeHelper::Watcher::Setup::Mongo
           Mongoid::Document.prepend Mongoid::UpgradeHelper::Watcher::Setup::Document
+          Mongoid::Findable.prepend Mongoid::UpgradeHelper::Watcher::Setup::Findable
 
           @watcher_is_setup = true
         end

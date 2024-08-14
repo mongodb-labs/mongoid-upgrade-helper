@@ -119,10 +119,12 @@ TrueClass.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 FalseClass.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 NilClass.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 Range.include(Mongoid::UpgradeHelper::Serializer::Atomic)
+Class.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 
 Hash.include(Mongoid::UpgradeHelper::Serializer::Hash)
 Array.include(Mongoid::UpgradeHelper::Serializer::Array)
 
+BSON::ObjectId.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 Mongoid::Document.include(Mongoid::UpgradeHelper::Serializer::Document)
 Mongoid::Criteria.include(Mongoid::UpgradeHelper::Serializer::Criteria)
 Mongoid::Contextual::Mongo.include(Mongoid::UpgradeHelper::Serializer::MongoContext)

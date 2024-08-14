@@ -18,11 +18,24 @@ module Mongoid
           include Watchable
 
           watch_method :delete
-          watch_method :find
           watch_method :insert
           watch_method :reload
           watch_method :remove
           watch_method :update_document
+        end
+
+        module Findable
+          include Watchable
+
+          watch_method :count
+          watch_method :estimated_count
+          watch_method :empty?
+          watch_method :exists?
+          watch_method :find
+          watch_method :find_by
+          watch_method :find_by!
+          watch_method :first
+          watch_method :last
         end
       end
     end
