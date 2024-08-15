@@ -28,7 +28,6 @@ module Mongoid
           include Watchable
 
           watch_method :count
-          watch_method :estimated_count
           watch_method :empty?
           watch_method :exists?
           watch_method :find
@@ -36,6 +35,10 @@ module Mongoid
           watch_method :find_by!
           watch_method :first
           watch_method :last
+
+          if Mongoid::VERSION >= '7.2'
+            watch_method :estimated_count
+          end
         end
       end
     end

@@ -44,13 +44,14 @@ class FeatureRunner
   def [](key)
     @results[key]
   end
+
+  def at_least?(version)
+    Mongoid::VERSION >= version
+  end
   
   feature :count do
     Person.count
-  end
-
-  feature :estimated_count do
-    Person.estimated_count
+    Person.estimated_count if at_least? '7.2'
   end
 
   feature :empty? do
@@ -59,8 +60,8 @@ class FeatureRunner
 
   feature :exists? do
     Person.exists?
-    Person.exists?(name: 'name')
-    Person.exists?(BSON::ObjectId.new)
+    Person.exists?(name: 'name') if at_least? '8.1'
+    Person.exists?(BSON::ObjectId.new) if at_least? '8.1'
   end
 
   feature :find_all do
