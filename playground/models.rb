@@ -9,6 +9,8 @@ class Person
   has_many :positions
 
   field :pronouns, type: String
+  field :kudos, type: Integer, default: 0
+  field :favorites, type: Array, default: []
 end
 
 class Name
@@ -66,6 +68,7 @@ class Team < Organization
   belongs_to :department
 
   has_many :members, class_name: 'Person'
+  has_many :projects
 
   def supervisor
     supervisor_position.person
@@ -79,4 +82,21 @@ class Position
   belongs_to :person
 
   field :title, type: String
+end
+
+class Project
+  include Mongoid::Document
+
+  belongs_to :team
+  embeds_many :tasks
+
+  field :name, type: String
+end
+
+class Task
+  include Mongoid::Document
+
+  embedded_in :project
+
+  field :label, type: String
 end

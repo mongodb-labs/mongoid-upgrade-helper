@@ -34,9 +34,7 @@ module Mongoid
 
           instance # force the singleton instance to be instantiated
 
-          Mongoid::Contextual::Mongo.prepend Mongoid::UpgradeHelper::Watcher::Setup::Mongo
-          Mongoid::Document.prepend Mongoid::UpgradeHelper::Watcher::Setup::Document
-          Mongoid::Findable.prepend Mongoid::UpgradeHelper::Watcher::Setup::Findable
+          Mongoid::UpgradeHelper::Watcher::Setup.apply!
 
           @watcher_is_setup = true
         end
@@ -78,8 +76,13 @@ module Mongoid
 
         # Temporarily disables the currently active watcher in the current
         # thread, for the duration of the block.
-        def suppress
-          current_watch, Thread.current[WATCHER_THREAD_KEY] = Thread.current[WATCHER_THREAD_KEY], nil
+        # 
+        # @param [ :all | nil ] mode if nil (the default), suppress only the
+        #   current active watcher. If :all, suppress any watcher for the
+        #   duration of the block.
+        def suppress(mode = nil)
+          new_watch = (mode == :all) ? :none : nil
+          current_watch, Thread.current[WATCHER_THREAD_KEY] = Thread.current[WATCHER_THREAD_KEY], new_watch
           yield
         ensure
           Thread.current[WATCHER_THREAD_KEY] = current_watch
@@ -134,7 +137,7 @@ module Mongoid
         def started(event)
           # we only emit the command if there is a current invocation active,
           # as that means we're within the scope of an observed API call.
-          emit :command, event.command.to_json if current_watch
+          emit :command, event.command.to_json if current_watch && current_watch != :none
         end
 
         # Invoked by the driver when a database command succeeds.

@@ -8,7 +8,7 @@ Mongoid::UpgradeHelper.on_action { |action| LOGGER.puts(action) }
 
 Mongoid::UpgradeHelper::Watcher.initialize!
 
-require_relative 'models'
+require_relative 'populator'
 Mongoid.connect_to 'mongoid-upgrade-helper-test'
 
 class FeatureRunner
@@ -35,6 +35,7 @@ class FeatureRunner
 
   def initialize
     @results = {}
+    @populator = Populator.new
   end
 
   def []=(key, value)
@@ -83,6 +84,61 @@ class FeatureRunner
 
   feature :last do
     Person.last
+  end
+
+  feature :create do
+    Company.create(name: 'Apple Inc.')
+    Company.create!(name: 'Microsoft Corporation')
+  end
+
+  feature :insert do
+    company = Company.new(name: 'Meta Platforms Inc')
+    company.insert
+  end
+
+  feature :delete do
+    self[:insert].delete
+    Company.where(:name.ne => self[:find_one].name).delete
+    Company.where(:name.ne => self[:find_one].name).delete_all
+    Project.delete_all
+
+    project = @populator.new_project(silent { Team.first })
+
+    # embedded record deletions
+    project.tasks.first.delete
+    project.tasks.delete(project.tasks.first)
+    project.tasks.delete_all
+  end
+
+  feature :destroy do
+    self[:insert].destroy
+    self[:insert].destroy!
+    Company.where(:name.ne => self[:find_one].name).destroy_all
+    Project.destroy_all
+  end
+
+  feature :inc do
+    person = silent { Person.first }
+    person.inc(kudos: 2)
+  end
+
+  feature :bit do
+    person = silent { Person.first }
+    person.bit(kudos: { and: 0x10, or: 0x101 })
+  end
+
+  feature :pop do
+    person = silent { Person.first }
+    person.pop(favorites: 1)
+    person.pop(favorites: -1)
+  end
+
+  private
+
+  def silent
+    Mongoid::UpgradeHelper::Watcher.suppress(:all) do
+      yield
+    end
   end
 end
 

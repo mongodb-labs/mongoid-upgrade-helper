@@ -94,6 +94,16 @@ module Mongoid
         end
       end
 
+      module EmbeddedMany
+        def _mongoid_upgrade_helper_serialize
+          'Mongoid::Relations::Embedded::Many.new(' <<
+            Serializer.serialize(base) << ',' <<
+            Serializer.serialize(target) << ',' <<
+            Serializer.serialize(__metadata) <<
+          ')'
+        end
+      end
+
       # A serializer for Mongoid::Document instances.
       module Document
         # Returns an "eval"-able string that will instantiate a new model and
@@ -128,3 +138,4 @@ BSON::ObjectId.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 Mongoid::Document.include(Mongoid::UpgradeHelper::Serializer::Document)
 Mongoid::Criteria.include(Mongoid::UpgradeHelper::Serializer::Criteria)
 Mongoid::Contextual::Mongo.include(Mongoid::UpgradeHelper::Serializer::MongoContext)
+Mongoid::Relations::Embedded::Many.include(Mongoid::UpgradeHelper::Serializer::EmbeddedMany)
