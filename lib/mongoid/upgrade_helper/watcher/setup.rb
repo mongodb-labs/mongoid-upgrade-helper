@@ -23,9 +23,22 @@ module Mongoid
           Mongoid::Persistable::Incrementable.prepend Incrementable
           Mongoid::Persistable::Logical.prepend Logical
           Mongoid::Persistable::Poppable.prepend Poppable
+          Mongoid::Persistable::Pullable.prepend Pullable
+          Mongoid::Persistable::Pushable.prepend Pushable
+          Mongoid::Persistable::Renamable.prepend Renamable
+          Mongoid::Persistable::Savable.prepend Savable
+          Mongoid::Persistable::Settable.prepend Settable
+          Mongoid::Persistable::Updatable.prepend Updatable
+          Mongoid::Persistable::Upsertable.prepend Upsertable
+          Mongoid::Persistable::Unsettable.prepend Unsettable
           Mongoid::Findable.prepend Findable
+          Mongoid::Reloadable.prepend Reloadable
 
-          Mongoid::Relations::Embedded::Many.prepend EmbedsMany
+          if Mongoid::VERSION < '7.0'
+            Mongoid::Relations::Embedded::Many.prepend EmbedsMany
+          else
+            Mongoid::Association::Embedded::EmbedsMany::Proxy.prepend EmbedsMany
+          end
         end
 
         module Mongo
@@ -50,13 +63,6 @@ module Mongoid
           watch_method :reload
           watch_method :remove
           watch_method :update_document
-        end
-
-        module EmbedsMany
-          include Watchable
-
-          watch_method :delete
-          watch_method :delete_all
         end
 
         module Creatable
@@ -121,6 +127,60 @@ module Mongoid
           watch_method :pop
         end
 
+        module Pullable
+          include Watchable
+
+          watch_method :pull
+          watch_method :pull_all
+        end
+
+        module Pushable
+          include Watchable
+
+          watch_method :add_to_set
+          watch_method :push
+        end
+
+        module Renamable
+          include Watchable
+
+          watch_method :rename
+        end
+
+        module Savable
+          include Watchable
+
+          watch_method :save
+          watch_method :save!
+        end
+
+        module Settable
+          include Watchable
+
+          watch_method :set
+        end
+
+        module Updatable
+          include Watchable
+
+          watch_method :update_attribute
+          watch_method :update_attributes
+          watch_method :update
+          watch_method :update!
+        end
+
+        module Upsertable
+          include Watchable
+
+          watch_method :upsert
+        end
+        
+        module Unsettable
+          include Watchable
+
+          watch_method :unset
+        end
+
         module Findable
           include Watchable
 
@@ -136,6 +196,19 @@ module Mongoid
           if Mongoid::VERSION >= '7.2'
             watch_method :estimated_count
           end
+        end
+
+        module Reloadable
+          include Watchable
+
+          watch_method :reload
+        end
+
+        module EmbedsMany
+          include Watchable
+
+          watch_method :delete
+          watch_method :delete_all
         end
       end
     end

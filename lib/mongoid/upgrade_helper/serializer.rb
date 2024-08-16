@@ -109,7 +109,7 @@ module Mongoid
         # Returns an "eval"-able string that will instantiate a new model and
         # populate it with the current attributes.
         def _mongoid_upgrade_helper_serialize
-          "#{self.class.name}.new(#{as_document.inspect})"
+          "#{self.class.name}.new(#{as_document.merge(new_record: new_record?).inspect})"
         end
       end
 
@@ -138,4 +138,9 @@ BSON::ObjectId.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 Mongoid::Document.include(Mongoid::UpgradeHelper::Serializer::Document)
 Mongoid::Criteria.include(Mongoid::UpgradeHelper::Serializer::Criteria)
 Mongoid::Contextual::Mongo.include(Mongoid::UpgradeHelper::Serializer::MongoContext)
-Mongoid::Relations::Embedded::Many.include(Mongoid::UpgradeHelper::Serializer::EmbeddedMany)
+
+if Mongoid::VERSION < '7.0'
+  Mongoid::Relations::Embedded::Many.include(Mongoid::UpgradeHelper::Serializer::EmbeddedMany)
+else
+  Mongoid::Association::Embedded::EmbedsMany::Proxy.include(Mongoid::UpgradeHelper::Serializer::EmbeddedMany)
+end

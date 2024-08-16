@@ -94,6 +94,7 @@ module Mongoid
         catch(:abort_mongoid_upgrade_helper_replay) do
           Replayer.replaying(entry[:watch]) do
             block = entry[:block] ? Proc.new { } : nil
+puts "replaying #{entry.inspect}"
             entry[:receiver].send(entry[:message], *entry[:args], **entry[:kwargs], &block)
           end
         end

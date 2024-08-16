@@ -102,7 +102,7 @@ class FeatureRunner
     Company.where(:name.ne => self[:find_one].name).delete_all
     Project.delete_all
 
-    project = @populator.new_project(silent { Team.first })
+    project = @populator.new_project(first_team)
 
     # embedded record deletions
     project.tasks.first.delete
@@ -118,19 +118,82 @@ class FeatureRunner
   end
 
   feature :inc do
-    person = silent { Person.first }
-    person.inc(kudos: 2)
+    first_person.inc(kudos: 2)
   end
 
   feature :bit do
-    person = silent { Person.first }
-    person.bit(kudos: { and: 0x10, or: 0x101 })
+    first_person.bit(kudos: { and: 0x10, or: 0x101 })
   end
 
   feature :pop do
-    person = silent { Person.first }
-    person.pop(favorites: 1)
-    person.pop(favorites: -1)
+    first_person.pop(favorites: 1)
+    first_person.pop(favorites: -1)
+  end
+
+  feature :pull do
+    first_person.pull(favorites: 'chocolate')
+    first_person.pull_all(favorites: %w[ chocolate running ])
+  end
+
+  feature :push do
+    first_person.add_to_set(favorites: 'chocolate')
+    first_person.add_to_set(favorites: %w[ chocolate running ])
+    first_person.push(favorites: 'chocolate')
+    first_person.push(favorites: %w[ chocolate running ])
+  end
+
+  feature :rename do
+    first_person.rename(kudos: 'praise')
+  end
+
+  feature :save do
+    person = silent { Team.last.members.new(name: Name.new(given: 'Rand', surname: "al'Thor")) }
+
+    # save -> create
+    person.save
+
+    # save -> create
+    person.kudos = 1000
+    person.save
+  end
+
+  feature :save! do
+    person = silent { Team.last.members.new(name: Name.new(given: 'Rand', surname: "al'Thor")) }
+
+    # save -> create
+    person.save!
+
+    # save -> create
+    person.kudos = 1000
+    person.save!
+  end
+
+  feature :set do
+    first_person.set kudos: 100, pronouns: 'ze/zir/zirs'
+  end
+
+  feature :update do
+    first_person.update_attribute :kudos, 50
+    first_person.update_attributes kudos: 60, pronouns: 'he/him/his'
+    first_person.update kudos: 70, pronouns: 'ze/zir/zirs'
+    first_person.update! kudos: 80, pronouns: 'they/them/theirs'
+  end
+
+  feature :upsert do
+    # new record
+    first_team.members.new(name: Name.new(given: 'Bilbo', surname: 'Baggins')).upsert
+
+    # existing record
+    first_person.kudos = 90
+    first_person.upsert
+  end
+
+  feature :unset do
+    first_person.unset :bogus1, :bogus2
+  end
+
+  feature :reload do
+    first_person.reload
   end
 
   private
@@ -139,6 +202,14 @@ class FeatureRunner
     Mongoid::UpgradeHelper::Watcher.suppress(:all) do
       yield
     end
+  end
+
+  def first_person
+    silent { Person.first }
+  end
+
+  def first_team
+    silent { Team.first }
   end
 end
 
