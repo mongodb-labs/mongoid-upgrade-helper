@@ -1,7 +1,8 @@
 require 'mongoid'
 
 class Person
-  include Mongoid::Document
+ include Mongoid::Document
+ include Mongoid::Attributes::Dynamic # because we rename kudos -> praise
 
   belongs_to :team
   embeds_one :name

@@ -96,21 +96,52 @@ module Mongoid
 
       module EmbeddedMany
         def _mongoid_upgrade_helper_serialize
-          'Mongoid::Relations::Embedded::Many.new(' <<
-            Serializer.serialize(base) << ',' <<
-            Serializer.serialize(target) << ',' <<
-            Serializer.serialize(__metadata) <<
-          ')'
+          name = if Mongoid::VERSION < '7.0'
+                   __metadata.name
+                 else
+                   _association.name
+                 end
+
+          Serializer.serialize(base) << '.' << name.to_s
         end
       end
 
       # A serializer for Mongoid::Document instances.
       module Document
+        module ClassMethods
+          def _mongoid_upgrade_helper_deserialize(klass, document, selector, id)
+            root = klass.new(document)
+
+            current = root
+            selector.split('.').each do |part|
+              if part =~ /^\d+$/
+                # an array index; `current` is expected to be an array
+                current = current[part.to_i]
+              else
+                relation = current.class.embedded_relations.values.detect { |rel| rel.store_as == part }
+                raise ArgumentError, "no relation matches #{part.inspect}" unless relation
+                current = current.send(relation.name)
+              end
+            end
+
+            if current.respond_to?(:find)
+              current.find(id)
+            else
+              current
+            end
+          end
+        end
+
         # Returns an "eval"-able string that will instantiate a new model and
         # populate it with the current attributes.
         def _mongoid_upgrade_helper_serialize
-          "#{self.class.name}.new(#{as_document.merge(new_record: new_record?).inspect})"
+          if embedded?
+            "Mongoid::Document._mongoid_upgrade_helper_deserialize(#{_root.class}, #{_root.as_document.merge(new_record: _root.new_record?).inspect}, #{atomic_path.inspect}, #{_id.inspect})"
+          else
+            "#{self.class.name}.new(#{as_document.merge(new_record: new_record?).inspect})"
+          end
         end
+
       end
 
       # A helper method for calling _mongoid_upgrade_helper_serialize on the
@@ -136,6 +167,7 @@ Array.include(Mongoid::UpgradeHelper::Serializer::Array)
 
 BSON::ObjectId.include(Mongoid::UpgradeHelper::Serializer::Atomic)
 Mongoid::Document.include(Mongoid::UpgradeHelper::Serializer::Document)
+Mongoid::Document.extend(Mongoid::UpgradeHelper::Serializer::Document::ClassMethods)
 Mongoid::Criteria.include(Mongoid::UpgradeHelper::Serializer::Criteria)
 Mongoid::Contextual::Mongo.include(Mongoid::UpgradeHelper::Serializer::MongoContext)
 
