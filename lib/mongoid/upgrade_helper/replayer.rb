@@ -3,6 +3,7 @@
 require 'base64'
 require 'json'
 require_relative 'replayer/setup'
+require_relative 'serializer'
 require_relative 'watcher'
 
 module Mongoid
@@ -92,12 +93,19 @@ module Mongoid
       # @param [ Hash ] entry the Hash of attributes that describe the entry.
       def replay_entry(entry)
         catch(:abort_mongoid_upgrade_helper_replay) do
-          Replayer.replaying(entry[:watch]) do
-            block = entry[:block] ? Proc.new { } : nil
-            entry[:receiver].send(entry[:message], *entry[:args], **entry[:kwargs], &block)
+          Replayer.replaying(entry['watch']) do
+            block = entry['block'] ? Proc.new { } : nil
+
+            receiver = Serializer.deserialize(entry['receiver'])
+            args = Serializer.deserialize(entry['args'])
+            kwargs = Serializer.deserialize(entry['kwargs'])
+
+            receiver.send(entry['message'], *args, **kwargs, &block)
           end
         end
       end
+
+      private
 
       # Parse the entry from the given line. Only `start` entries are considered;
       # anything else will return `nil`.
@@ -111,7 +119,8 @@ module Mongoid
         action, watch, payload = line.split(':', 3)
         return nil unless action == 'start'
 
-        eval(payload).merge(watch: watch)
+        data = JSON.parse(payload)
+        data.merge('watch' => watch)
       end
     end
   end

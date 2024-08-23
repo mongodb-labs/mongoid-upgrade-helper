@@ -109,7 +109,7 @@ module Mongoid
           Thread.current[WATCHER_THREAD_KEY] = next_id
 
           payload = { receiver: receiver,
-                      message: message,
+                      message: message.to_s,
                       args: args,
                       kwargs: kwargs,
                       block: block_present }
@@ -156,16 +156,11 @@ module Mongoid
       # Serializes (via JSON) the given payload, and then passes the result to
       # the registered `on_action` handler.
       def emit(action, payload = nil)
-        full_payload = "#{action}:#{current_watch}:#{payload}"
+        full_payload = "#{action}:#{current_watch}:#{payload.to_json}"
 
         Mongoid::UpgradeHelper.on_action&.call(full_payload)
       rescue Exception => e
         Mongoid.logger.error("could not emit Mongoid::UpgradeHelper action: #{e.class} #{e.message}")
-      end
-
-      def marshal(payload)
-        dump = Marshal.dump(payload)
-        Base64.strict_encode64(dump)
       end
 
       def next_id

@@ -4,7 +4,8 @@ module Mongoid
   module UpgradeHelper
     class Analyzer
       def initialize(log1, log2)
-        @log1 = parse_log(log1)
+        @incidents = {}
+        @log1 = parse_log(log1, @incidents)
         @log2 = parse_log(log2)
       end
 
@@ -27,7 +28,7 @@ module Mongoid
                 cmd_b = normalize(cmd_b)
 
                 if cmd_a != cmd_b
-                  diff << report_different_comands(watch, cmd_a, cmd_b)
+                  diff << report_different_commands(watch, cmd_a, cmd_b)
                 end
               end
             end
@@ -37,11 +38,16 @@ module Mongoid
 
       private
 
-      def parse_log(log)
+      def parse_log(log, incidents = nil)
         {}.tap do |watches|
           File.open(log) do |file|
             file.each_line do |line|
               action, watch, payload = line.split(':', 3)
+
+              if action == 'start' && incidents
+                incidents[watch] = payload
+              end
+
               next unless action == 'command'
 
               (watches[watch] ||= []) << payload
@@ -86,18 +92,24 @@ module Mongoid
       end
 
       def report_lone_command(log, watch, phrase)
-        { msg: "watch #{watch} only exists in the #{phrase}",
-          watch: log[watch] }
+        { type: :lone_command,
+          msg: "watch #{watch} only exists in the #{phrase}",
+          cmd: @incidents[watch],
+          info: log[watch] }
       end
 
       def report_different_command_counts(watch)
-        { msg: "watch #{watch} has different command counts #{@log1[watch].count} vs #{@log2[watch].count}",
-          watch: [ @log1[watch], @log2[watch] ] }
+        { type: :different_counts,
+          msg: "watch #{watch} has different command counts #{@log1[watch].count} vs #{@log2[watch].count}",
+          cmd: @incidents[watch],
+          info: [ @log1[watch], @log2[watch] ] }
       end
 
       def report_different_commands(watch, cmd1, cmd2)
-        { msg: "watch #{watch} has different commands",
-          watch: [ cmd1, cmd2 ] }
+        { type: :different_commands,
+          msg: "watch #{watch} has different commands",
+          cmd: @incidents[watch],
+          info: [ cmd1, cmd2 ] }
       end
     end
   end
