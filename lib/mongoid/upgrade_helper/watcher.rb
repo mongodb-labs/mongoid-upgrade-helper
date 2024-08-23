@@ -137,7 +137,7 @@ module Mongoid
         def started(event)
           # we only emit the command if there is a current invocation active,
           # as that means we're within the scope of an observed API call.
-          emit :command, event.command.to_json if current_watch && current_watch != :none
+          emit :command, event.command if current_watch && current_watch != :none
         end
 
         # Invoked by the driver when a database command succeeds.
