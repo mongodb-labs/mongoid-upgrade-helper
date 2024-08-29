@@ -14,6 +14,8 @@ module Mongoid
       # @api private
       REPLAYER_THREAD_KEY = :__mongoid_upgrade_helper_replayer
 
+      REPLAYER_RESULTS_THREAD_KEY = :__mongoid_upgrade_helper_replayer_results
+
       class << self
         # Initializes the runtime environment, preparing it so that commands can
         # be replayed. This also initializes the Watcher subsystem.
@@ -23,8 +25,7 @@ module Mongoid
         def setup!
           return if @replayer_is_ready
 
-          Mongo::Server::ConnectionBase.prepend(Mongoid::UpgradeHelper::Replayer::ConnectionBase)
-
+          Mongoid::UpgradeHelper::Replayer::Setup.apply!
           Mongoid::UpgradeHelper::Watcher.initialize!
 
           @replayer_is_ready = true
@@ -48,6 +49,10 @@ module Mongoid
         # Indicates whether a replayer is active in the current thread.
         def replaying?
           Thread.current[REPLAYER_THREAD_KEY]
+        end
+
+        def next_result
+          (Thread.current[REPLAYER_RESULTS_THREAD_KEY] || []).shift.tap { |v| p v }
         end
         
         # Creates a new replayer that wraps the contents of the file with the
@@ -80,10 +85,51 @@ module Mongoid
       # Steps through each line of the replayer's source, parsing them one at
       # a time and replaying the `start` entries.
       def replay!
-        @source.each do |line|
-          entry = parse_entry(line) or next
+        loop do
+          # entries will be in the following format
+          #   'start' -- describing the API that initiated this
+          #   0 or more of
+          #     - 1 or more of 'command' followed by 'result'
+          #     - 0 or more nested entries
+          #   'stop'
+          #
+          # we read a line, which must be 'start'
 
-          replay_entry(entry)
+          line = @source.next
+          action, watch, entry = parse_entry(line)
+          abort "expected `start` action, got #{action.inspect}" unless action == 'start'
+
+          # process "command" and "result" up until we read a "stop" action,
+          # or the next action is "start".
+          enqueue_results!
+
+          replay_entry(entry, watch)
+        end
+      rescue StopIteration
+      end
+
+      def enqueue_results!
+        Thread.current[REPLAYER_RESULTS_THREAD_KEY] ||= []
+
+        loop do
+          line = @source.peek
+          action, * = parse_entry(line)
+          if action == 'command'
+            @source.next # skip the command
+
+            line = @source.next # read the result
+            action, _, result = parse_entry(line)
+
+            if action != 'result'
+              raise ArgumentError, "expected result after command, got #{action.inspect}"
+            end
+
+            Thread.current[REPLAYER_RESULTS_THREAD_KEY].push Serializer.deserialize(result)
+          elsif action == 'stop'
+            @source.next # skip the 'stop'
+          else
+            break
+          end
         end
       end
 
@@ -91,17 +137,15 @@ module Mongoid
       # type, or the results are undefined.
       #
       # @param [ Hash ] entry the Hash of attributes that describe the entry.
-      def replay_entry(entry)
-        catch(:abort_mongoid_upgrade_helper_replay) do
-          Replayer.replaying(entry['watch']) do
-            block = entry['block'] ? Proc.new { } : nil
+      def replay_entry(entry, watch)
+        Replayer.replaying(watch) do
+          block = entry['block'] ? Proc.new { } : nil
 
-            receiver = Serializer.deserialize(entry['receiver'])
-            args = Serializer.deserialize(entry['args'])
-            kwargs = Serializer.deserialize(entry['kwargs'])
+          receiver = Serializer.deserialize(entry['receiver'])
+          args = Serializer.deserialize(entry['args']) || []
+          kwargs = Serializer.deserialize(entry['kwargs']) || {}
 
-            receiver.send(entry['message'], *args, **kwargs, &block)
-          end
+          receiver.send(entry['message'], *args, **kwargs, &block)
         end
       end
 
@@ -117,10 +161,7 @@ module Mongoid
       # @param [ String ] line the line to parse.
       def parse_entry(line)
         action, watch, payload = line.split(':', 3)
-        return nil unless action == 'start'
-
-        data = JSON.parse(payload)
-        data.merge('watch' => watch)
+        return [ action, watch, JSON.parse(payload) ]
       end
     end
   end

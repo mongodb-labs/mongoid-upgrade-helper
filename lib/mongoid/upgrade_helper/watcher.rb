@@ -40,7 +40,7 @@ module Mongoid
         end
 
         # delegate to the singleton instance for convenience
-        def_delegators :instance, :watch, :suppress, :with_watch
+        def_delegators :instance, :watch, :suppress, :with_watch, :save_result
       end
 
       # Create a new Watcher instance. This will attempt to subscribe globally to all
@@ -100,6 +100,11 @@ module Mongoid
           Thread.current[WATCHER_THREAD_KEY] = saved
         end
 
+        def save_result(result)
+          serialized = Serializer.serialize(result)
+          emit :result, serialized if current_watch && current_watch != :none
+        end
+
         private
 
         # Starts listening for commands from the given receiver#message
@@ -142,12 +147,12 @@ module Mongoid
 
         # Invoked by the driver when a database command succeeds.
         def succeeded(event)
-          # we don't actually care whether the command succeeded or not
+          # we don't actually care if the command succeeds
         end
 
-        # Invoked by the driver when a database command fails..
+        # Invoked by the driver when a database command fails.
         def failed(event)
-          # we don't actually care whether the command succeeded or not
+          # we don't actually care if the command fails
         end
       end
 

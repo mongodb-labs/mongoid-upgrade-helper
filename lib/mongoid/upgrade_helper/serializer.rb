@@ -76,8 +76,8 @@ module Mongoid
 
         def _mongoid_upgrade_helper_serialize(_env = {})
           { __mongoid_serialized: 'Range',
-            first: Serializer.serialize(first),
-            last: Serializer.serialize(last), 
+            first: Serializer.serialize(first, env),
+            last: Serializer.serialize(last, env), 
             exclude_end: exclude_end?
           }
         end
@@ -257,7 +257,7 @@ module Mongoid
 
           { __mongoid_serialized: self.class.name,
             env: env,
-            id: Serializer.serialize(id) }
+            id: Serializer.serialize(id, env) }
         end
 
         def _mongoid_upgrade_helper_serialize_target(proxy, env)
@@ -296,7 +296,31 @@ module Mongoid
             end
           end
 
-          { __mongoid_serialized: self.class.name, id: Serializer.serialize(_id) }
+          { __mongoid_serialized: self.class.name, id: Serializer.serialize(_id, env) }
+        end
+      end
+
+      module ProtocolMsg
+        extend ActiveSupport::Concern
+
+        class_methods do
+          def _mongoid_upgrade_helper_deserialize(data, env = {})
+            allocate.tap do |object|
+              data['ivars'].each do |name, value|
+                value = Serializer.deserialize(value, env)
+                object.instance_variable_set(name, value)
+              end
+            end
+          end
+        end
+
+        def _mongoid_upgrade_helper_serialize(env = {})
+          ivars = instance_variables.each_with_object({}) do |ivar, hash|
+                    hash[ivar] = Serializer.serialize(instance_variable_get(ivar), env)
+                  end
+
+          { __mongoid_serialized: self.class.name,
+            ivars: ivars }
         end
       end
 
@@ -328,6 +352,8 @@ Range.include(Mongoid::UpgradeHelper::Serializer::Range)
 Symbol.include(Mongoid::UpgradeHelper::Serializer::Symbol)
 
 BSON::ObjectId.include(Mongoid::UpgradeHelper::Serializer::ObjectId)
+
+Mongo::Protocol::Msg.include(Mongoid::UpgradeHelper::Serializer::ProtocolMsg)
 
 Mongoid::Criteria.include(Mongoid::UpgradeHelper::Serializer::Criteria)
 Mongoid::Contextual::Mongo.include(Mongoid::UpgradeHelper::Serializer::MongoContext)

@@ -9,6 +9,8 @@ module Mongoid
       # the standard Mongoid API.
       module Setup
         def self.apply!
+          ::Mongo::Server::ConnectionBase.prepend(ConnectionBase)
+
           Mongoid::Contextual::Mongo.prepend Mongo
 
           Mongoid::Criteria.prepend Criteria
@@ -209,6 +211,14 @@ module Mongoid
 
           watch_method :delete
           watch_method :delete_all
+        end
+
+        module ConnectionBase
+          def deliver(*)
+            super.tap do |result|
+              Watcher.save_result(result)
+            end
+          end
         end
       end
     end
